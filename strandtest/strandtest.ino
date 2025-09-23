@@ -3,8 +3,8 @@
 // Pin Definitions
 #define BUTTON_PIN 21       // Pin connected to the button
 #define LED_PIN 6          // Pin connected to the Neopixel data input
-#define NUM_PIXELS 30      // Total number of LEDs on the Neopixel strip
-#define ACTIVE_PIXELS 28   // Number of LEDs to glow
+#define NUM_PIXELS 200      // Total number of LEDs on the Neopixel strip
+#define ACTIVE_PIXELS 60   // Number of LEDs to glow
 
 // Neopixel object
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
@@ -67,18 +67,20 @@ void loop() {
   lastButtonState = buttonState;
 }
 
-// Function to set the color on the first 28 LEDs
+// Fonction pour allumer les LEDs une par une avec une couleur donnée
 void setStripColor(uint32_t color) {
   for (int i = 0; i < ACTIVE_PIXELS; i++) {
     strip.setPixelColor(i, color);
+    strip.show(); // Met à jour la bande pour afficher la nouvelle LED allumée
+    delay(25);    // Petite pause pour voir l'effet de progression
   }
-  strip.show();  // Update the strip to display the color
 }
 
-// Function to set each of the first 28 LEDs to a different random color
+// Fonction pour allumer les LEDs une par une avec des couleurs aléatoires
 void setRandomStripColors() {
   for (int i = 0; i < ACTIVE_PIXELS; i++) {
-    strip.setPixelColor(i, randomColor());  // Assign a random color to each LED
+    strip.setPixelColor(i, randomColor()); // Assigne une couleur aléatoire à chaque LED
+    strip.show(); // Met à jour la bande pour afficher la nouvelle LED allumée
+    delay(25);    // Petite pause pour voir l'effet de progression
   }
-  strip.show();  // Update the strip to display the colors
 }
