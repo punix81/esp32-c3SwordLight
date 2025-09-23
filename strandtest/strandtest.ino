@@ -3,8 +3,8 @@
 // Pin Definitions
 #define BUTTON_PIN 21       // Pin connected to the button
 #define LED_PIN 6          // Pin connected to the Neopixel data input
-#define NUM_PIXELS 120      // Total number of LEDs on the Neopixel strip
-#define ACTIVE_PIXELS 60  // Number of LEDs to glow
+#define NUM_PIXELS 30      // Total number of LEDs on the Neopixel strip
+#define ACTIVE_PIXELS 28   // Number of LEDs to glow
 
 // Neopixel object
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
@@ -45,14 +45,14 @@ void setup() {
 void loop() {
   // Read the state of the button
   bool buttonState = digitalRead(BUTTON_PIN);
-
+  
   // Detect button press (transition from HIGH to LOW)
   if (buttonState == LOW && lastButtonState == HIGH) {
     buttonPressed = true;
   } else {
     buttonPressed = false;
   }
-
+  
   // When the button is pressed, change the color
   if (buttonPressed) {
     currentColorIndex = (currentColorIndex + 1) % 12;  // Cycle through 12 colors
@@ -62,7 +62,7 @@ void loop() {
       setStripColor(colors[currentColorIndex]);  // Set the new color on the strip
     }
   }
-
+  
   // Update the last button state
   lastButtonState = buttonState;
 }
