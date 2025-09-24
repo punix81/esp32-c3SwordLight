@@ -4,7 +4,7 @@
 #define BUTTON_PIN 21       // Pin connected to the button
 #define LED_PIN 6          // Pin connected to the Neopixel data input
 #define NUM_PIXELS 200      // Total number of LEDs on the Neopixel strip
-#define ACTIVE_PIXELS 60   // Number of LEDs to glow
+#define ACTIVE_PIXELS 120   // Number of LEDs to glow
 
 // Neopixel object
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
