@@ -6,7 +6,7 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
-// 🔹 Broches I2C (ESP32-C3 Mini)
+// 🔹 Broches I2C pour ESP32-C3
 #define SDA_PIN 20
 #define SCL_PIN 21
 
@@ -22,18 +22,19 @@ Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 // 🔹 Objet bouton
 ezButton button(BUTTON_PIN);
 
-unsigned long lastCount = 0;
-int ledBrightness = 0;       // niveau actuel de luminosité
-int fadeAmount = 5;          // vitesse du fade
+// 🔹 Variables
+int value = 10;               // valeur de départ
+int ledBrightness = 0;        // luminosité LED
+int fadeAmount = 5;           // vitesse du fade
 unsigned long lastFadeTime = 0;
 
 void setup() {
   Serial.begin(115200);
 
-  // Initialise I2C
+  // 🔹 Initialise le bus I2C
   Wire.begin(SDA_PIN, SCL_PIN);
 
-  // Initialise OLED
+  // 🔹 Initialise l’écran OLED
   if (!oled.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("❌ SSD1306 allocation failed"));
     while (true);
@@ -41,49 +42,60 @@ void setup() {
 
   delay(500);
   oled.clearDisplay();
-  oled.setTextSize(2);
+  oled.setTextSize(3);
   oled.setTextColor(WHITE);
-  oled.setCursor(0, 10);
-  oled.println(F("Ready"));
+  oled.setCursor(40, 20);
+  oled.println(value);
   oled.display();
 
-  // Configure le bouton
+  // 🔹 Configure le bouton
   button.setDebounceTime(50);
   button.setCountMode(COUNT_FALLING);
 
-  // Configure la LED
+  // 🔹 Configure la LED
   pinMode(LED_PIN, OUTPUT);
 
   Serial.println("✅ Setup done !");
 }
 
 void loop() {
-  // 🔹 Gestion du bouton
+  // --- Gestion du bouton ---
   button.loop();
-  unsigned long count = button.getCount();
 
-  if (lastCount != count) {
-    Serial.println(count);
-    oled.clearDisplay();
-    oled.setTextSize(3);
-    oled.setCursor(40, 20);
-    oled.println(count);
-    oled.display();
+  if (button.isPressed()) {
+    if (value > 0) {
+      value--;
+      Serial.print("Valeur actuelle: ");
+      Serial.println(value);
 
-    lastCount = count;
+      oled.clearDisplay();
+      oled.setTextSize(3);
+      oled.setTextColor(WHITE);
+
+      if (value > 0) {
+        oled.setCursor(50, 20);
+        oled.println(value);
+      } else {
+        oled.setTextSize(2);
+        oled.setCursor(10, 25);
+        oled.println(F("Recharge"));
+      }
+
+      oled.display();
+    }
+    delay(200); // petite pause pour éviter les doubles pressions
   }
 
-  // 🔹 Effet fade LED ("breathing")
+  // --- Effet fade LED ("breathing") ---
   unsigned long currentTime = millis();
-  if (currentTime - lastFadeTime >= 30) {  // ajuste la vitesse ici
+  if (currentTime - lastFadeTime >= 30) {
     lastFadeTime = currentTime;
     ledBrightness += fadeAmount;
 
-    // inverse la direction du fade aux limites
     if (ledBrightness <= 0 || ledBrightness >= 255) {
       fadeAmount = -fadeAmount;
     }
 
-    analogWrite(LED_PIN, ledBrightness); // crée le fade
+    analogWrite(LED_PIN, ledBrightness);
   }
 }
