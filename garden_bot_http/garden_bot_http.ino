@@ -1,6 +1,8 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 
+
+// === ⚙️ configuraton pour un wemos d1 mini , il faut peux t etre installer le driver CH340 sous windows voir https://sparks.gogo.co.nz/ch340.html  ===
 // === ⚙️ Configuration WiFi ===
 const char* ssid = "Punix81";          // 👉 Remplace par le nom de ton WiFi
 const char* password = "Cyb:admin04jo4yJ"; // 👉 Et ici le mot de passe
