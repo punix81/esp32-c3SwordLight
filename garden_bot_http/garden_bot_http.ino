@@ -1,16 +1,79 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <Adafruit_Sensor.h>
+#include <DHT.h>
+#include <DHT_U.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 
 // === ⚙️ configuraton pour un wemos d1 mini , il faut peux t etre installer le driver CH340 sous windows voir https://sparks.gogo.co.nz/ch340.html  ===
 // === ⚙️ Configuration WiFi ===
 const char* ssid = "Punix81";          // 👉 Remplace par le nom de ton WiFi
 const char* password = "Cyb:admin04jo4yJ"; // 👉 Et ici le mot de passe
+ 
+// === 🌡️ DHT11 ===
+#define DHTPIN D4
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
 
-// === 🌐 Création du serveur sur le port 80 (HTTP standard) ===
+// === 🖥️ OLED ===
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// === 🌐 Serveur Web ===
 ESP8266WebServer server(80);
 
-// === 🔧 Page HTML Cyberpunk ===
+float temperature = 0.0;
+float humidity = 0.0;
+bool dhtError = false;
+
+// === 📊 Lecture du DHT11 ===
+void readDHT() {
+  float t = dht.readTemperature();
+  float h = dht.readHumidity();
+
+  if (isnan(t) || isnan(h)) {
+    dhtError = true;
+  } else {
+    dhtError = false;
+    temperature = t;
+    humidity = h;
+  }
+}
+
+// === 🖥️ Mise à jour de l’écran OLED ===
+void updateOLED() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println("🌐 Cyberpunk Monitor");
+
+  if (dhtError) {
+    display.setTextSize(1);
+    display.setCursor(0, 20);
+    display.println("❌ Capteur DHT11");
+    display.println("non detecte !");
+  } else {
+    display.setTextSize(2);
+    display.setCursor(0, 20);
+    display.print(temperature, 1);
+    display.print("C");
+
+    display.setCursor(0, 45);
+    display.print(humidity, 0);
+    display.print("%");
+  }
+
+  display.display();
+}
+
+// === 🔧 Page HTML ===
 void handleRoot() {
   String html = R"rawliteral(
 <!DOCTYPE html>
@@ -23,7 +86,7 @@ void handleRoot() {
   body {
     background-color: #0a0a0f;
     color: #00fff7;
-    font-family: 'Orbitron', Arial, sans-serif;
+    font-family: "Orbitron", Arial, sans-serif;
     text-shadow: 0 0 8px #00fff7;
     margin: 0;
     padding: 0;
@@ -33,15 +96,10 @@ void handleRoot() {
     justify-content: center;
     height: 100vh;
   }
-
   h1 {
-    font-size: 2em;
-    text-transform: uppercase;
     color: #ff00ff;
     text-shadow: 0 0 15px #ff00ff, 0 0 25px #00fff7;
-    margin-bottom: 20px;
   }
-
   .panel {
     border: 2px solid #00fff7;
     border-radius: 10px;
@@ -51,82 +109,27 @@ void handleRoot() {
     width: 300px;
     text-align: center;
   }
-
-  .data {
-    font-size: 1.5em;
-    margin: 10px 0;
-  }
-
-  .label {
-    color: #ff00ff;
-    font-size: 0.9em;
-    text-transform: uppercase;
-  }
-
-  .glow-bar {
-    height: 10px;
-    background: linear-gradient(90deg, #00fff7, #ff00ff);
-    animation: glowMove 3s infinite linear;
-    border-radius: 5px;
-  }
-
-  @keyframes glowMove {
-    from { background-position: 0 0; }
-    to { background-position: 200px 0; }
-  }
-
-  .footer {
-    margin-top: 20px;
-    font-size: 0.8em;
-    color: #666;
-  }
-
-  .scanline {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: repeating-linear-gradient(
-      0deg,
-      rgba(0, 255, 255, 0.05),
-      rgba(0, 255, 255, 0.05) 1px,
-      transparent 2px,
-      transparent 4px
-    );
-    pointer-events: none;
-    animation: scanMove 6s linear infinite;
-  }
-
-  @keyframes scanMove {
-    from { background-position: 0 0; }
-    to { background-position: 0 100%; }
+  .error {
+    color: red;
+    text-shadow: 0 0 10px red;
   }
 </style>
 </head>
 <body>
-  <div class="scanline"></div>
   <h1>System Monitor</h1>
   <div class="panel">
-    <div class="data">
-      <div class="label">Température</div>
-      <span id="temp">-- °C</span>
-    </div>
-    <div class="data">
-      <div class="label">Humidité</div>
-      <span id="hum">-- %</span>
-    </div>
-    <div class="glow-bar"></div>
-  </div>
-  <div class="footer">🧠 Cyberpunk Monitoring - v1.0</div>
+)rawliteral";
 
-<script>
-  // Simulation de données (à remplacer plus tard par des valeurs réelles)
-  setInterval(() => {
-    document.getElementById("temp").textContent = (20 + Math.random() * 10).toFixed(1) + " °C";
-    document.getElementById("hum").textContent = (40 + Math.random() * 30).toFixed(0) + " %";
-  }, 2000);
-</script>
+  if (dhtError) {
+    html += "<div class='error'>❌ Erreur : capteur DHT11 non détecté !</div>";
+  } else {
+    html += "<div>🌡️ Température : " + String(temperature, 1) + " °C</div>";
+    html += "<div>💧 Humidité : " + String(humidity, 0) + " %</div>";
+  }
+
+  html += R"rawliteral(
+  </div>
+  <div style="margin-top:20px;font-size:0.8em;color:#666;">🧠 Cyberpunk Monitoring - v2.0</div>
 </body>
 </html>
 )rawliteral";
@@ -134,21 +137,25 @@ void handleRoot() {
   server.send(200, "text/html", html);
 }
 
-// === 🔧 Page 404 ===
-void handleNotFound() {
-  String message = "Erreur 404 : page non trouvée\n";
-  message += "URI demandée : ";
-  message += server.uri();
-  server.send(404, "text/plain", message);
-}
-
 // === 🚀 Setup ===
 void setup() {
   Serial.begin(115200);
   delay(1000);
-  Serial.println();
-  Serial.println("Démarrage du Wemos D1 Mini...");
+  Serial.println("Démarrage...");
 
+  // DHT
+  dht.begin();
+
+  // OLED
+  Wire.begin(D2, D1); // SDA, SCL
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("❌ Écran OLED introuvable !");
+    for (;;);
+  }
+  display.clearDisplay();
+  display.display();
+
+  // WiFi
   WiFi.begin(ssid, password);
   Serial.print("Connexion à ");
   Serial.println(ssid);
@@ -156,19 +163,20 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
-
   Serial.println("\n✅ WiFi connecté !");
-  Serial.print("🌐 Adresse IP : ");
+  Serial.print("🌐 IP : ");
   Serial.println(WiFi.localIP());
 
+  // Routes serveur
   server.on("/", handleRoot);
-  server.onNotFound(handleNotFound);
-
   server.begin();
   Serial.println("🚀 Serveur HTTP démarré !");
 }
 
 // === ♻️ Boucle principale ===
 void loop() {
+  readDHT();
+  updateOLED();
   server.handleClient();
+  delay(2000);
 }
