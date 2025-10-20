@@ -52,12 +52,12 @@ void updateOLED() {
   display.setTextColor(SSD1306_WHITE);
 
   display.setCursor(0, 0);
-  display.println("🌐 Cyberpunk Monitor");
+  display.println("Cyberpunk Monitor");
 
   if (dhtError) {
     display.setTextSize(1);
     display.setCursor(0, 20);
-    display.println("❌ Capteur DHT11");
+    display.println("Capteur DHT11");
     display.println("non detecte !");
   } else {
     display.setTextSize(2);
