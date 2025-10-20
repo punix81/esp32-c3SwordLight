@@ -35,6 +35,7 @@ void setup() {
   roboEyes.begin(SCREEN_WIDTH, SCREEN_HEIGHT, 60); // 60 FPS max
   roboEyes.setPosition(DEFAULT);
   roboEyes.setAutoblinker(ON, 3, 2);
+  roboEyes.setMood(ANGRY);
 
   display.clearDisplay();
   display.display();
