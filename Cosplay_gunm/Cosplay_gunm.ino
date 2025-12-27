@@ -19,7 +19,7 @@
 Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 ezButton button(BUTTON_PIN);
 
-int value = 10;               // Valeur de départ
+int value = 12;               // Valeur de départ
 int ledBrightness = 0;        // Luminosité actuelle de la LED
 int fadeAmount = 5;           // Vitesse du fade
 unsigned long lastFadeTime = 0;
