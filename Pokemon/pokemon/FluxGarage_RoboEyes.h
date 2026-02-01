@@ -32,24 +32,52 @@ uint8_t BGCOLOR = 0; // background and overlays
 uint8_t MAINCOLOR = 1; // drawings
 
 // For mood type switch
+#ifndef DEFAULT
 #define DEFAULT 0
+#endif
+#ifndef TIRED
 #define TIRED 1
+#endif
+#ifndef ANGRY
 #define ANGRY 2
+#endif
+#ifndef HAPPY
 #define HAPPY 3
+#endif
 
 // For turning things on or off
+#ifndef ON
 #define ON 1
+#endif
+#ifndef OFF
 #define OFF 0
+#endif
 
 // For switch "predefined positions"
+#ifndef N
 #define N 1 // north, top center
+#endif
+#ifndef NE
 #define NE 2 // north-east, top right
+#endif
+#ifndef E
 #define E 3 // east, middle right
+#endif
+#ifndef SE
 #define SE 4 // south-east, bottom right
+#endif
+#ifndef S
 #define S 5 // south, bottom center
+#endif
+#ifndef SW
 #define SW 6 // south-west, bottom left
+#endif
+#ifndef W
 #define W 7 // west, middle left
-#define NW 8 // north-west, top left 
+#endif
+#ifndef NW
+#define NW 8 // north-west, top left
+#endif
 // for middle center set "DEFAULT"
 
 
