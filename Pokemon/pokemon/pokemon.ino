@@ -11,6 +11,23 @@
 // ✅ RoboEyes (FluxGarage)
 #include "FluxGarage_RoboEyes.h" // local header (template version) in the sketch folder
 
+// New: include card classes
+#include "cards/CardBase.h"
+#include "cards/CardWeather.h"
+#include "cards/CardBtc.h"
+#include "cards/CardWifi.h"
+#include "cards/CardUptime.h"
+#include "cards/CardTime.h"
+#include "cards/CardEyes.h"
+
+// Card instances (globales)
+CardWeather *cardWeather = nullptr;
+CardBtc *cardBtc = nullptr;
+CardWifi *cardWifi = nullptr;
+CardUptime *cardUptime = nullptr;
+CardTime *cardTime = nullptr;
+CardEyes *cardEyes = nullptr;
+
 // ---------- OLED ----------
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -280,6 +297,10 @@ void refreshAll(bool showUi) {
   if (!wOk) { weatherLine1 = "ERR"; weatherLine2 = "meteo"; }
   if (!bOk) { btcLine1 = "ERR"; btcLine2 = "btc"; }
 
+  // Update card instances with new data
+  if (cardWeather) cardWeather->setLines(weatherLine1, weatherLine2);
+  if (cardBtc) cardBtc->setLines(btcLine1, btcLine2);
+
   lastRefreshMs = millis();
 }
 
@@ -295,73 +316,30 @@ void enterEyesCard() {
 // ---------- Cards ----------
 void drawCard() {
   if (cardIndex == CARD_EYES) {
-    enterEyesCard();
-    return; // roboEyes.update() in loop() handles animation
+    // delegate to eyes card
+    if (cardEyes) cardEyes->draw();
+    return;
   }
 
-  display.clearDisplay();
-
   switch (cardIndex) {
-    case CARD_WEATHER: {
-      headerBar("METEO FRIBOURG");
-      clearBody();
-      bodyPrint(2, BODY_Y + 6, weatherLine1, 2);
-      bodyPrint(2, BODY_Y + 40, weatherLine2, 1);
+    case CARD_WEATHER:
+      if (cardWeather) cardWeather->draw();
       break;
-    }
-    case CARD_BTC: {
-      headerBar("BTC/CHF");
-      clearBody();
-      bodyPrint(2, BODY_Y + 6, "BTC spot", 1);
-      bodyPrint(2, BODY_Y + 24, btcLine1, 1);
-      bodyPrint(2, BODY_Y + 40, btcLine2, 1);
+    case CARD_BTC:
+      if (cardBtc) cardBtc->draw();
       break;
-    }
-    case CARD_WIFI: {
-      headerBar("WIFI");
-      clearBody();
-      bodyPrint(2, BODY_Y + 2, "SSID: " + WiFi.SSID(), 1);
-      bodyPrint(2, BODY_Y + 14, "IP: " + ipToString(WiFi.localIP()), 1);
-      bodyPrint(2, BODY_Y + 26, "RSSI: " + String(WiFi.RSSI()) + " dBm", 1);
-      bodyPrint(2, BODY_Y + 35, (WiFi.status() == WL_CONNECTED ? "OK" : "OFF"), 2);
+    case CARD_WIFI:
+      if (cardWifi) cardWifi->draw();
       break;
-    }
-    case CARD_UPTIME: {
-      headerBar("UPTIME");
-      clearBody();
-      unsigned long s = millis() / 1000;
-      unsigned long m = s / 60; s %= 60;
-      unsigned long h = m / 60; m %= 60;
-      bodyPrint(2, BODY_Y + 10, String(h) + "h " + String(m) + "m", 2);
-      bodyPrint(2, BODY_Y + 32, "Wemos running", 1);
+    case CARD_UPTIME:
+      if (cardUptime) cardUptime->draw();
       break;
-    }
-    case CARD_TIME: {
-      headerBar("HEURE");
-      clearBody();
-
-      if (!timeReady()) {
-        bodyPrint(2, BODY_Y + 10, "Sync NTP...", 1);
-      } else {
-        time_t nowT = time(nullptr);
-        struct tm* t = localtime(&nowT);
-
-        char buf1[16];
-        snprintf(buf1, sizeof(buf1), "%02d:%02d:%02d", t->tm_hour, t->tm_min, t->tm_sec);
-
-        char buf2[16];
-        snprintf(buf2, sizeof(buf2), "%02d.%02d.%04d", t->tm_mday, t->tm_mon + 1, t->tm_year + 1900);
-
-        bodyPrint(2, BODY_Y + 6, String(buf1), 2);
-        bodyPrint(2, BODY_Y + 40, String(buf2), 1);
-      }
+    case CARD_TIME:
+      if (cardTime) cardTime->draw();
       break;
-    }
     default:
       break;
   }
-
-  display.display();
 }
 
 void connectWifi() {
@@ -390,6 +368,9 @@ void connectWifi() {
   }
   display.display();
   delay(800);
+
+  // Update wifi card data
+  if (cardWifi) cardWifi->setInfo(String(WiFi.SSID()), ipToString(WiFi.localIP()), WiFi.RSSI());
 }
 
 void setup() {
@@ -402,6 +383,14 @@ void setup() {
   if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
     for(;;);
   }
+
+  // Create card instances now that display exists
+  cardWeather = new CardWeather(display, weatherLine1, weatherLine2);
+  cardBtc = new CardBtc(display, btcLine1, btcLine2);
+  cardWifi = new CardWifi(display);
+  cardUptime = new CardUptime(display);
+  cardTime = new CardTime(display);
+  cardEyes = new CardEyes(display, roboEyes);
 
   // ✅ Init RoboEyes (framerate ~60)
   roboEyes.begin(SCREEN_WIDTH, SCREEN_HEIGHT, 60);
