@@ -138,6 +138,12 @@ String weatherLine2 = "-";
 String btcLine1 = "-";
 String btcLine2 = "-";
 
+// Crypto symbols list for CardBtc: BTC, ETH, XRP, FLUX
+const String CRYPTO_SYMBOLS[] = { "BTC-CHF", "ETH-CHF", "XRP-CHF", "SOL-CHF" };
+const String CRYPTO_TITLES[] = { "BTC/CHF", "ETH/CHF", "XRP/CHF", "SOL/CHF" };
+const int CRYPTO_COUNT = 4;
+int cryptoIndex = 0; // start with BTC
+
 // ---------- UI helpers (bicolore) ----------
 void headerBar(const String& t) {
   display.fillRect(0, 0, SCREEN_WIDTH, HEADER_H, BLACK);
@@ -281,6 +287,34 @@ bool fetchBtcChf() {
   return true;
 }
 
+// Fetch price for a given crypto pair via Coinbase public API (e.g., BTC-CHF)
+bool fetchCryptoBySymbol(const String &pair, String &outAmount, String &outInfo) {
+  String url = String("https://api.coinbase.com/v2/prices/") + pair + String("/spot");
+  String body;
+  if (!httpsGet(url, body)) return false;
+  String amountStr = extractStringAfter(body, "amount");
+  String cur = extractStringAfter(body, "currency");
+  if (amountStr.length() == 0) return false;
+  float amountF = amountStr.toFloat();
+  char buf[32];
+  // format with 2 decimals
+  snprintf(buf, sizeof(buf), "%.2f", amountF);
+  outAmount = String(buf) + " " + (cur.length() ? cur : "CHF");
+  outInfo = String("Coinbase spot");
+  return true;
+}
+
+bool fetchCryptoByIndex(int idx) {
+  if (idx < 0 || idx >= CRYPTO_COUNT) return false;
+  String amount, info;
+  if (!fetchCryptoBySymbol(CRYPTO_SYMBOLS[idx], amount, info)) return false;
+  btcLine1 = amount;
+  btcLine2 = info;
+  if (cardBtc) cardBtc->setTitle(CRYPTO_TITLES[idx]);
+  if (cardBtc) cardBtc->setLines(btcLine1, btcLine2);
+  return true;
+}
+
 // ---------- Refresh ----------
 void refreshAll(bool showUi) {
   if (showUi) {
@@ -292,10 +326,10 @@ void refreshAll(bool showUi) {
   }
 
   bool wOk = fetchWeatherFribourg();
-  bool bOk = fetchBtcChf();
+  bool bOk = fetchCryptoByIndex(cryptoIndex); // fetch currently selected crypto
 
   if (!wOk) { weatherLine1 = "ERR"; weatherLine2 = "meteo"; }
-  if (!bOk) { btcLine1 = "ERR"; btcLine2 = "btc"; }
+  if (!bOk) { btcLine1 = "ERR"; btcLine2 = "crypto"; }
 
   // Update card instances with new data
   if (cardWeather) cardWeather->setLines(weatherLine1, weatherLine2);
@@ -386,7 +420,7 @@ void setup() {
 
   // Create card instances now that display exists
   cardWeather = new CardWeather(display, weatherLine1, weatherLine2);
-  cardBtc = new CardBtc(display, btcLine1, btcLine2);
+  cardBtc = new CardBtc(display, CRYPTO_TITLES[cryptoIndex], btcLine1, btcLine2);
   cardWifi = new CardWifi(display);
   cardUptime = new CardUptime(display);
   cardTime = new CardTime(display);
@@ -457,12 +491,23 @@ void loop() {
 
   // Nouveau: changement d'humeur via BTN_MOOD (D7)
   if (bMood.pressed) {
-    moodIndex = (moodIndex + 1) % MOODS_COUNT;
-    roboEyes.setMood(moodIndex);
-    roboEyes.open(); // forcer l'ouverture/rafraîchissement
-    // Si on est sur la carte EYES, roboEyes.update() affichera la nouvelle humeur rapidement
-    // sinon on redessine la carte courante pour afficher l'effet
-    if (cardIndex != CARD_EYES) drawCard();
+    if (cardIndex == CARD_BTC) {
+      // change crypto displayed
+      cryptoIndex = (cryptoIndex + 1) % CRYPTO_COUNT;
+      if (!fetchCryptoByIndex(cryptoIndex)) {
+        // fallback: show error
+        btcLine1 = "ERR";
+        btcLine2 = "crypto";
+        if (cardBtc) cardBtc->setLines(btcLine1, btcLine2);
+      }
+      if (cardIndex != CARD_EYES) drawCard();
+    } else {
+      // original behavior: change mood
+      moodIndex = (moodIndex + 1) % MOODS_COUNT;
+      roboEyes.setMood(moodIndex);
+      roboEyes.open(); // forcer l'ouverture/rafraîchissement
+      if (cardIndex != CARD_EYES) drawCard();
+    }
     delay(80);
   }
 
