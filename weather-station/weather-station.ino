@@ -1,22 +1,24 @@
+#include <FS.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <SPIFFS.h>
+
 #include <lvgl.h>
 #include <TFT_eSPI.h>
 
 #include "weather_images.h"
-#include <WiFi.h>
+#include "WebConfig.h"
+
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
-// Replace with your network credentials
-const char* ssid = "";
-const char* password = "";
-
-// Replace with the latitude and longitude to where you want to get the weather
-String latitude = "46.8065";
-String longitude = "7.1619";
-// Enter your location
-String location = "Fribourg";
-// Type the timezone you want to get the time for
-String timezone = "Europe/Zurich";
+// Les valeurs seront chargées depuis la configuration web
+String ssid;
+String password;
+String latitude;
+String longitude;
+String location;
+String timezone;
 
 // Store date and time
 String current_date;
@@ -54,7 +56,7 @@ String weather_description;
 #define DRAW_BUF_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
 static uint32_t draw_buf[DRAW_BUF_SIZE / 4];
 
-// Backlight CYD (tu as validé que 21 marche chez toi)
+// Backlight CYD
 #define TFT_BL 21
 
 void log_print(lv_log_level_t level, const char * buf) {
@@ -172,7 +174,7 @@ void lv_create_main_gui(void) {
 }
 
 void get_weather_description(int code) {
-  // Sécurité si appelé avant création de l’image
+  // Sécurité si appelé avant création de l'image
   if (!weather_image) return;
 
   switch (code) {
@@ -208,15 +210,15 @@ void get_weather_data() {
   }
 
   HTTPClient http;
-String tzEncoded = timezone;
-tzEncoded.replace("/", "%2F");
+  String tzEncoded = timezone;
+  tzEncoded.replace("/", "%2F");
 
-String url = String("http://api.open-meteo.com/v1/forecast?latitude=" + latitude +
-                    "&longitude=" + longitude +
-                    "&current=temperature_2m,relative_humidity_2m,is_day,precipitation,rain,weather_code" +
-                    temperature_unit +
-                    "&timezone=" + tzEncoded +
-                    "&forecast_days=1");
+  String url = String("http://api.open-meteo.com/v1/forecast?latitude=" + latitude +
+                      "&longitude=" + longitude +
+                      "&current=temperature_2m,relative_humidity_2m,is_day,precipitation,rain,weather_code" +
+                      temperature_unit +
+                      "&timezone=" + tzEncoded +
+                      "&forecast_days=1");
 
   http.begin(url);
   int httpCode = http.GET();
@@ -251,6 +253,25 @@ void setup() {
   Serial.begin(115200);
   delay(200);
 
+  // Initialiser SPIFFS pour sauvegarder les configurations
+  if (!SPIFFS.begin(true)) {
+    Serial.println("SPIFFS Mount Failed");
+    return;
+  }
+  Serial.println("SPIFFS initialized");
+
+  // Charger les configurations sauvegardées
+  loadConfig();
+  ssid = config.ssid;
+  password = config.password;
+  latitude = config.latitude;
+  longitude = config.longitude;
+  location = config.location;
+  timezone = config.timezone;
+
+  // Initialiser le serveur web et le point d'accès
+  initWebServer();
+
   // Force backlight ON (sinon écran noir)
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, HIGH);
@@ -262,75 +283,78 @@ void setup() {
   lv_display_t * disp = lv_tft_espi_create(SCREEN_WIDTH, SCREEN_HEIGHT, draw_buf, sizeof(draw_buf));
 
 #if USE_LANDSCAPE
-  lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90);   // si c’est à l’envers, mets 270
+  lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90);
 #else
   lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_270);
 #endif
 
   // Affiche tout de suite quelque chose
   lv_obj_t *boot = lv_label_create(lv_screen_active());
-  lv_label_set_text(boot, "Connecting WiFi...");
+  lv_label_set_text(boot, "Initializing...");
   lv_obj_center(boot);
   lv_timer_handler();
 
-WiFi.mode(WIFI_STA);
-WiFi.disconnect(true, true);
-delay(200);
-
-// Debug: scan pour voir si ton SSID est bien en 2.4 GHz
-Serial.println("Scanning WiFi...");
-int n = WiFi.scanNetworks();
-Serial.printf("Found %d networks\n", n);
-for (int i = 0; i < n; i++) {
-  Serial.printf("  %2d) %s  RSSI:%d  CH:%d  %s\n",
-                i + 1,
-                WiFi.SSID(i).c_str(),
-                WiFi.RSSI(i),
-                WiFi.channel(i),
-                (WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "OPEN" : "SEC"));
-}
-WiFi.scanDelete();
-
-// Connexion
-Serial.printf("Connecting to SSID: %s\n", ssid);
-WiFi.begin(ssid, password);
-
-unsigned long start = millis();
-while (WiFi.status() != WL_CONNECTED && millis() - start < 20000) { // 20s
-  // Laisse LVGL respirer pour éviter un écran “figé”
-  lv_timer_handler();
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.disconnect(true, false);
   delay(200);
-  Serial.print(".");
-}
 
-Serial.println();
-Serial.printf("WiFi.status=%d\n", (int)WiFi.status());
+  // Debug: scan pour voir les réseaux disponibles
+  Serial.println("Scanning WiFi networks...");
+  int n = WiFi.scanNetworks();
+  Serial.printf("Found %d networks\n", n);
+  for (int i = 0; i < n; i++) {
+    Serial.printf("  %2d) %s  RSSI:%d  CH:%d  %s\n",
+                  i + 1,
+                  WiFi.SSID(i).c_str(),
+                  WiFi.RSSI(i),
+                  WiFi.channel(i),
+                  (WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "OPEN" : "SEC"));
+  }
+  WiFi.scanDelete();
 
-if (WiFi.status() == WL_CONNECTED) {
-  Serial.print("WiFi OK IP: ");
-  Serial.println(WiFi.localIP());
-} else {
-  Serial.println("WiFi FAIL. Most common reasons: 5GHz SSID / WPA3-only / wrong band.");
-}
+  // Connexion au WiFi STA
+  Serial.printf("Connecting to SSID: %s\n", ssid.c_str());
+  WiFi.begin(ssid.c_str(), password.c_str());
 
-
-  Serial.println();
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("WiFi OK IP: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("WiFi FAIL -> offline mode");
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 20000) {
+    lv_timer_handler();
+    delay(200);
+    Serial.print(".");
   }
 
-  // Nettoie l’écran et construit l’UI
+  Serial.println();
+  Serial.printf("WiFi.status=%d\n", (int)WiFi.status());
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("WiFi OK - IP: ");
+    Serial.println(WiFi.localIP());
+
+    lv_obj_t *bootMsg = lv_label_create(lv_screen_active());
+    lv_label_set_text(bootMsg, "WiFi Connected");
+    lv_obj_center(bootMsg);
+    lv_timer_handler();
+    delay(2000);
+  } else {
+    Serial.println("WiFi FAIL -> Using AP mode");
+    Serial.print("Connect to AP: ");
+    Serial.println(AP_SSID);
+    Serial.print("IP: ");
+    Serial.println(AP_IP);
+  }
+
+  // Nettoie l'écran et construit l'UI
   lv_obj_clean(lv_screen_active());
-  get_weather_data();      // si wifi OK, remplira les valeurs
-  lv_create_main_gui();    // sinon placeholders
+  get_weather_data();
+  lv_create_main_gui();
 }
 
 void loop() {
+  // Gérer les requêtes HTTP du serveur web
+  handleWebRequests();
+
+  // Gestion LVGL
   lv_timer_handler();
-  lv_tick_inc(5);     // <-- OBLIGATOIRE (supprime l’avertissement)
+  lv_tick_inc(5);
   delay(5);
 }
